@@ -1,6 +1,15 @@
 import torch
 from torch.utils.data import Dataset
 
+def pad_to_len(seqs, to_len, padding=0):
+    paddeds = []
+    for seq in seqs:
+        paddeds.append(
+            seq[:to_len] + [padding] * max(0, to_len - len(seq))
+        )
+
+    return paddeds
+
 class BertDataset(Dataset):
     def __init__(self, data, max_text_len=512):
         # 開頭是[CLS], QA分隔是[SEP], [PAD]補滿
@@ -17,34 +26,29 @@ class BertDataset(Dataset):
             'input_ids': self.data[index]["input_ids"],
             'token_type_ids': self.data[index]["token_type_ids"],
             'attention_mask': self.data[index]["attention_mask"],
+            'pos_tag': self.data[index]["pos_tag"],
         }
 
-        if 'answerable' in self.data[index]:
-            item['answerable'] = self.data[index]['answerable']
-            item['answer_token'] = self.data[index]['answer_token']
-            item['answer_text'] = self.data[index]['answer_text']
-            item['answer_start'] = self.data[index]['answer_start']
-            item['answer_end'] = self.data[index]['answer_end']
+        if 'tag_n' in self.data[index]:
+            item['tag_n'] = self.data[index]['tag_n']
+            item['value'] = self.data[index]['value']
 
         return item
 
     def collate_fn(self, samples):
         batch = {}
         key_1 = ['id']
-        key2tensor = ['input_ids',"token_type_ids", 'attention_mask']
+        key2tensor = ['pos_tag', 'input_ids',"token_type_ids", 'attention_mask']
 
-        if 'answerable' in samples[0]:
-            key_1.append("answer_text")
-            key_1.append("answer_token")
-            key2tensor.append("answerable")
-            key2tensor.append("answer_start")
-            key2tensor.append("answer_end")
+        if 'tag_n' in samples[0]:
+            batch["tag_n"] = torch.tensor([sample["tag_n"] for sample in samples])
 
         for key in key_1:
             batch[key] = [sample[key] for sample in samples]
 
         for key in key2tensor:
             batch[key] = [sample[key] for sample in samples]
+            batch[key] = pad_to_len(batch[key], 512) 
             batch[key] = torch.tensor(batch[key])
         
         return batch

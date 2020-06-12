@@ -133,3 +133,6 @@ final
 
 # training data
 release/
+release2/
+lightning_logs/
+dataset/*.pkl

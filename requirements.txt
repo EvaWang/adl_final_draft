@@ -1,0 +1,7 @@
+torch==1.4 
+torchvision==0.5.0
+pytorch-lightning
+pandas
+transformers
+xlrd
+rakutenma
