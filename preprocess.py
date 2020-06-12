@@ -39,6 +39,11 @@ def main(args):
     df_train = pd.concat(df_list, axis=0, ignore_index=True)  
     del df_list
 
+    samples = normalize_data(df_train, config)
+
+    tagged_num = sum([ len(t) for t in df_train['Tag']])
+    # print(tagged_num)
+    print(f"tagged/untagged weight:{tagged_num/(len(df_train['Tag'])*20)}")
 
     logging.info('Creating dataset pickle...')
     create_bert_dataset(
@@ -112,6 +117,7 @@ def process_samples(samples, config, is_test=False):
             'token_type_ids': tokenized_text_encode["token_type_ids"],
             'attention_mask': tokenized_text_encode["attention_mask"],
             'tag_n': tag_n,
+            'tag': sample["Tag"],
             'pos_tag': tokenized_text_pos,
             'value': val # 抽取出來 對應tag的值 先不管
         }
