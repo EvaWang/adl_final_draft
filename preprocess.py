@@ -33,17 +33,18 @@ def main(args):
     df_train = []
     df_list = []
     for filepath in tqdm(file_list):
+        filename = os.path.basename(filepath).split('.')[0]
         df = pd.read_excel(os.path.join(config["data_folder"], filepath), header=0)
+        df['ID'] = df['Index'].map(lambda x: filename+'-'+str(x))
         df_list.append(df)
         
     df_train = pd.concat(df_list, axis=0, ignore_index=True)  
     del df_list
 
-    samples = normalize_data(df_train, config)
-
-    tagged_num = sum([ len(t) for t in df_train['Tag']])
-    # print(tagged_num)
-    print(f"tagged/untagged weight:{tagged_num/(len(df_train['Tag'])*20)}")
+    # samples = normalize_data(df_train, config)
+    # tagged_num = sum([ len(t) for t in df_train['Tag']])
+    # total = len(df_train['Tag'])*20
+    # print(f"tagged/untagged weight:{(total-tagged_num)/tagged_num}")
 
     logging.info('Creating dataset pickle...')
     create_bert_dataset(
@@ -112,7 +113,7 @@ def process_samples(samples, config, is_test=False):
 
         tokenized_text_encode = tokenizer.encode_plus(sample["Text"], pad_to_max_length=True, return_attention_mask=True, return_token_type_ids=True, max_length=config["max_text_len"])
         item = {
-            'id': sample.index,
+            'id': sample["ID"],
             'input_ids': tokenized_text_encode["input_ids"],
             'token_type_ids': tokenized_text_encode["token_type_ids"],
             'attention_mask': tokenized_text_encode["attention_mask"],

@@ -30,10 +30,10 @@ class BertQA(pl.LightningModule):
         self.bert = BertModel.from_pretrained('cl-tohoku/bert-base-japanese', output_attentions=True)
 
         # predict tag concate(seq,tag)
-        self.classifier = nn.Sequential( nn.Dropout(hparams.dropout_rate), nn.Linear(self.bert.config.hidden_size+1, 20))
-        # self.fc_out = nn.Sequential( nn.Linear(self.bert.config.hidden_size + 511, 20))
+        self.classifier = nn.Sequential( nn.Dropout(hparams.dropout_rate), nn.Linear(self.bert.config.hidden_size+1, 1))
+        self.fc_out = nn.Linear(511, 20)
         # ignore_index 可能用不到
-        self.tag_loss = nn.CrossEntropyLoss(ignore_index=hparams.ignore_index)
+        self.tag_loss = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(hparams.pos_weight, dtype=torch.float))
 
         # for extract answer
         # self.find_start = nn.Sequential( nn.Dropout(hparams.dropout_rate), nn.Linear(self.bert.config.hidden_size, 1))
@@ -52,6 +52,7 @@ class BertQA(pl.LightningModule):
         pos_tag = pos_tag[:,1:].unsqueeze(2)
         hidden_and_tag = torch.cat((last_hidden_state[:,1:], pos_tag), 2)
         logit = self.classifier(hidden_and_tag)
+        logit = self.fc_out(logit.squeeze(2))
         return logit
 
         # for extract answer
@@ -62,7 +63,7 @@ class BertQA(pl.LightningModule):
         # return logit.squeeze(1), logit_start.squeeze(2), logit_end.squeeze(2)
 
     def _unpack_batch(self, batch):
-        return batch['input_ids'], batch['token_type_ids'], batch['attention_mask'], batch["pos_tag"].float(),  batch["tag_n"].long()
+        return batch['input_ids'], batch['token_type_ids'], batch['attention_mask'], batch["pos_tag"].float(),  batch["tag_n"].float()
 
 
     def _calculate_tag_loss(self, y_hat, y):
@@ -156,7 +157,7 @@ hparams = Namespace(**{
     'dropout_rate':0.5,
     'num_workers':4,
     'ignore_index':-1,
-    'pos_weight': 0.4,
+    'pos_weight': 98.85,
 })
 
 def prediction(args):

@@ -1,6 +1,8 @@
 ## 實驗記錄
-1. lr:0.001, avg_loss:5.259191036224365,f1: *TODO*, memo: 更新前的dataset, v_num=25
-2. lr:0.0005
+1. lr:0.0005, avg_loss: ,f1: *TODO*, memo: Sigmoid, BCEWithLogitsLoss , v_num=42
+2. lr:0.0005, avg_loss: ,f1: *TODO*, memo: 拿掉Sigmoid, BCEWithLogitsLoss , v_num=43
+3. lr:0.0005, avg_loss: ,f1: *TODO*, memo: 前面weight都錯了 , v_num=44
+
 
 Python 3.7.5
 
