@@ -30,6 +30,7 @@ class BertDataset(Dataset):
         }
 
         if 'tag_n' in self.data[index]:
+            item['tag'] = self.data[index]['tag']
             item['tag_n'] = self.data[index]['tag_n']
             item['value'] = self.data[index]['value']
 
@@ -38,9 +39,11 @@ class BertDataset(Dataset):
     def collate_fn(self, samples):
         batch = {}
         key_1 = ['id']
-        key2tensor = ['pos_tag', 'input_ids',"token_type_ids", 'attention_mask']
+        key2tensor = ['input_ids',"token_type_ids", 'attention_mask', 'pos_tag']
+        key2pad_tensor = ['pos_tag']
 
         if 'tag_n' in samples[0]:
+            key_1.append('tag')
             batch["tag_n"] = torch.tensor([sample["tag_n"] for sample in samples])
 
         for key in key_1:
@@ -48,7 +51,8 @@ class BertDataset(Dataset):
 
         for key in key2tensor:
             batch[key] = [sample[key] for sample in samples]
-            batch[key] = pad_to_len(batch[key], 512) 
+            if key in key2pad_tensor:
+                batch[key] = pad_to_len(batch[key], 512) 
             batch[key] = torch.tensor(batch[key])
         
         return batch
