@@ -135,5 +135,6 @@ final
 release/
 release2/
 lightning_logs/
+lightning_logs_1/
 dataset/*.pkl
 *.csv

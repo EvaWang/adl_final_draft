@@ -8,23 +8,24 @@ from transformers import BertTokenizer
 from BertDataset import BertDataset
 from tqdm import tqdm
 import pandas as pd
+import numpy as np
 import unicodedata
 import re
 from rakutenma import RakutenMA
 
 import sys
-# from collections import deque 
 
 rma = RakutenMA() # (default: phi = 2048, c = 0.003906)
-rma.load("./dataset/model_ja.min.json")
-rma.hash_func = rma.create_hash_func(15)
 
 tokenizer = BertTokenizer.from_pretrained('cl-tohoku/bert-base-japanese', do_lower_case=True)
 
 def main(args):
 
-    with open(args.output_dir / 'config.json') as f:
+    with open(args.config_path / 'config.json') as f:
         config = json.load(f)
+    
+    rma.load(args.config_path / "/model_ja.min.json")
+    rma.hash_func = rma.create_hash_func(15)
         
     print(f"config:{config}")
 
@@ -48,8 +49,8 @@ def main(args):
 
     logging.info('Creating dataset pickle...')
     create_bert_dataset(
-        process_samples(df_train, config, args.is_testset==1),
-        args.output_dir / args.output_filename,
+        process_samples(df_train, config, config["is_testset"]),
+        config["output_filename"],
         config["max_text_len"]
     )
 
@@ -65,88 +66,156 @@ def normalize_data(df_train, config):
 
     return df_train
 
+def map_pos(tokenized_text, config_pos_map):
+    text_pos = rma.tokenize("".join(tokenized_text))
+    pos_indices = []
+    current_len = 0
+    for pos_token in text_pos:
+        current_len = current_len+len(pos_token[0])
+        pos_indices.append(current_len)
+
+    # 尋找對應詞性
+    tokenized_text_pos = [0] # 第一個token是CLS 擺0
+    count_len = 0 # 累積長度
+    pos_idx = 0 # 目前pos index
+    for token_char in tokenized_text:
+        if count_len > pos_indices[pos_idx]:
+            pos_idx = pos_idx+1
+            
+        try:
+            pos_tag = config_pos_map[text_pos[pos_idx][1]]
+        except:
+            pos_tag = 0
+
+        tokenized_text_pos.append(pos_tag)
+        if token_char == tokenizer.unk_token:# 遇到[UNK]先加一 看有沒有bug (有)
+            count_len = count_len+1
+        elif '##' in token_char: # 遇到wordpieces_prefix: [##___]
+            count_len = count_len+ len(token_char) -2
+        else: 
+            count_len = count_len+ len(token_char)
+
+    return tokenized_text_pos
+    # 詞性對應完成
+
+# 1-D
+def map_value(tokenized_text, vals):
+    # ['(', '4', ')', '納', '入', '期', '間', '平', '成', '30', '年', '3', '月', '1', '日', 'から', '平', '成', '31', '年', '2', '月', '28', '日', 'ま', '##て']
+    # ['平成30年', '平成30年3月1日', '平成31年2月28日']
+    content_str = "".join(tokenized_text).replace("##","")
+    content_tag = np.zeros(len(tokenized_text))
+    for val in vals:
+        tokenized_val = "".join(tokenizer.tokenize(val)).replace("##","")
+        start = content_str.find(tokenized_val)
+        if start<0: 
+            print(content_str)
+            print(tokenized_val)
+            continue
+        end = start+ len(tokenized_val)
+        content_tag[start:end] = 1
+
+    return content_tag.tolist()
+
+# 2-D src_len*20
+def map_valuebyChar(tokenized_text, tags, vals):
+    content_str = "".join(tokenized_text).replace("##","")
+    content_tag = np.zeros((len(tokenized_text),20))
+    for v_i, val in enumerate(vals):
+        tokenized_val = "".join(tokenizer.tokenize(val)).replace("##","")
+        start = content_str.find(tokenized_val)
+        if start<0: 
+            print(content_str)
+            print(tokenized_val)
+            continue
+        end = start+ len(tokenized_val)
+        content_tag[start:end, (tags[v_i]-1)] = 1
+
+    return content_tag
+
 # TODO: read limit from config
 def process_samples(samples, config, is_test=False):
     samples = normalize_data(samples, config)
 
     stack = []
+    content = []
+    content_idx = []
+    content_tag = []
+    current_page = samples["ID"][0].split('-')[0]
+    tag_n = np.zeros(20)
+    stop_count = 30
     for i, sample in tqdm(samples.iterrows(), total=samples.shape[0]):
-        # parent_idx = sample["Parent Index"]
-        # is_title = sample["Is Title"]
+        line_idx = sample["ID"]
+        is_title = True # 不分段
+        # try:
+        #     # 下一個是title則前面內容清空
+        #     is_title = True if type(samples["Is Title"][i+1]) != float else False
+        # except:
+        #     # 最後一行
+        #     is_title = True
+
         tokenized_text = tokenizer.tokenize(sample["Text"])
-        text_pos = rma.tokenize(sample["Text"])
-        val = []
-        tag_n = []
-        pos = []
-
-        pos_indices = []
-        current_len = 0
-        for pos_token in text_pos:
-            current_len = current_len+len(pos_token[0])
-            pos_indices.append(current_len)
-
-        tokenized_text_pos = [0]
-        count_len = 0 # 累積長度
-        pos_idx = 0 # 目前pos index
-        for i, token_char in enumerate(tokenized_text):
-            if count_len > pos_indices[pos_idx]:
-                pos_idx = pos_idx+1
-                
-            try:
-                pos_tag = config["pos_map"][text_pos[pos_idx][1]]
-            except:
-                pos_tag = 0
-
-            tokenized_text_pos.append(pos_tag)
-            if token_char == tokenizer.unk_token:# 遇到[UNK]先加一 看有沒有bug (有)
-                count_len = count_len+1
-            elif '##' in token_char: # 遇到wordpieces_prefix: [##___]
-                count_len = count_len+ len(token_char) -2
-            else: 
-                count_len = count_len+ len(token_char)
-
         if is_test == False:
-            tag_n = sample['Tag_n']
+            tag_n = np.logical_or(tag_n, sample['Tag_n'])
             if type(sample["Value"]) != float: 
                 value_list = sample["Value"].split(";")
-                val = [tokenizer.tokenize(sub_val) for sub_val in value_list]
+                content_tag = content_tag + map_value(tokenized_text, value_list)
 
-        tokenized_text_encode = tokenizer.encode_plus(sample["Text"], pad_to_max_length=True, return_attention_mask=True, return_token_type_ids=True, max_length=config["max_text_len"])
-        item = {
-            'id': sample["ID"],
-            'input_ids': tokenized_text_encode["input_ids"],
-            'token_type_ids': tokenized_text_encode["token_type_ids"],
-            'attention_mask': tokenized_text_encode["attention_mask"],
-            'tag_n': tag_n,
-            'tag': sample["Tag"],
-            'pos_tag': tokenized_text_pos,
-            'value': val # 抽取出來 對應tag的值 先不管
-        }
-        stack.append(item)
+         # 組合同段落 
+        line_start = len(content)
+        content = content + tokenized_text
+        line_end = len(content)
+        content_idx.append([line_idx, line_start, line_end])
+        # 組合同段落完畢
 
-        # TODO: 將段落併在一起訓練
-        # if is_title:
-            # paragraph_text, paragraph_tag, paragraph_val
-            
+        if (is_title or current_page != line_idx.split('-')[0]) and len(content)>0:
+            # 先清空前面的content、content_idx
+            tokenized_text_pos = map_pos(content, config["pos_map"])
+            current_page = line_idx.split('-')[0]
+            tokenized_text_encode = tokenizer.encode_plus("".join(content), pad_to_max_length=True, return_attention_mask=True, return_token_type_ids=True, max_length=config["max_text_len"])
+            item = {
+                'id': i,
+                'content': content,
+                'segment_idx':content_idx,
+                'input_ids': tokenized_text_encode["input_ids"],
+                'token_type_ids': tokenized_text_encode["token_type_ids"],
+                'attention_mask': tokenized_text_encode["attention_mask"],
+                'pos_tag': tokenized_text_pos,
+                'tag_n': (tag_n*1).tolist(),
+                'tag': sample['Tag'],
+                'value': content_tag
+            }
+
+            stack.append(item)
+            # # debug
+            # stop_count = stop_count -1
+            # if stop_count<0:
+            #     sys.exit()
+            # else:
+            #     pass
+            #     print(f'content:     {content}')
+            #     print(f'segment_idx: {item["segment_idx"]}')
+            #     print(f'input_ids:   {item["input_ids"]}')
+            #     print(f'pos_tag:     {item["pos_tag"]}')
+            #     print(f'tag_n:       {item["tag_n"]}')
+            #     print(f'value:       {item["value"]}')
+
+            content = []
+            content_idx = []
+            tag_n = np.zeros(20)
+            content_tag = []
+   
     return stack
 
 
-def create_bert_dataset(samples, save_path, config):
-    dataset = BertDataset(
-        samples
-    )
+def create_bert_dataset(samples, save_path, max_text_len):
+    dataset = BertDataset(samples, max_text_len)
     with open(save_path, 'wb') as f:
         pickle.dump(dataset, f)
 
 
 def _parse_args():
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument('is_testset', type=int, default=0,)
-    # parser.add_argument('input_filepath', type=Path)
-    parser.add_argument('output_dir', type=Path,
-                        help='')
-    parser.add_argument('output_filename', type=Path,
-    help='')
+    parser.add_argument('config_path', type=Path, help='')
     args = parser.parse_args()
     return args
 

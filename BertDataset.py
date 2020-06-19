@@ -11,7 +11,7 @@ def pad_to_len(seqs, to_len, padding=0):
     return paddeds
 
 class BertDataset(Dataset):
-    def __init__(self, data, max_text_len=512):
+    def __init__(self, data, max_text_len=50):
         # 開頭是[CLS], QA分隔是[SEP], [PAD]補滿
         self.data = data
         self.max_text_len = max_text_len
@@ -23,6 +23,7 @@ class BertDataset(Dataset):
 
         item = {
             'id': self.data[index]['id'],
+            'segment_idx': self.data[index]['segment_idx'],
             'input_ids': self.data[index]["input_ids"],
             'token_type_ids': self.data[index]["token_type_ids"],
             'attention_mask': self.data[index]["attention_mask"],
@@ -38,21 +39,32 @@ class BertDataset(Dataset):
 
     def collate_fn(self, samples):
         batch = {}
-        key_1 = ['id']
+        key_1 = ['id','segment_idx']
         key2tensor = ['input_ids',"token_type_ids", 'attention_mask', 'pos_tag']
         key2pad_tensor = ['pos_tag']
 
         if 'tag_n' in samples[0]:
             key_1.append('tag')
-            batch["tag_n"] = torch.tensor([sample["tag_n"] for sample in samples])
+            key2tensor.append('value')
+            key2pad_tensor.append('value')
 
+            for sample in samples:
+                has_no_tag = [1]
+                if sum(sample["tag_n"])>0:
+                    has_no_tag = [0]
+                sample["tag_n"] = has_no_tag + sample["tag_n"]
+
+            batch["tag_n"] = torch.tensor([sample["tag_n"] for sample in samples])
+            
         for key in key_1:
             batch[key] = [sample[key] for sample in samples]
 
         for key in key2tensor:
             batch[key] = [sample[key] for sample in samples]
             if key in key2pad_tensor:
-                batch[key] = pad_to_len(batch[key], 512) 
+                batch[key] = pad_to_len(batch[key], self.max_text_len) 
             batch[key] = torch.tensor(batch[key])
+
         
+        # print(f"batch['value'].size():{batch['value'].size()}")
         return batch
