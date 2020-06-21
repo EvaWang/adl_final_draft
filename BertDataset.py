@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data import Dataset
+import random
 
 def pad_to_len(seqs, to_len, padding=0):
     paddeds = []
@@ -35,24 +36,36 @@ class BertDataset(Dataset):
             item['tag_n'] = self.data[index]['tag_n']
             item['value'] = self.data[index]['value']
 
+        if 'start_idx' in self.data[index]:
+            item['start_idx'] = self.data[index]['start_idx']
+            item['end_idx'] = self.data[index]['end_idx']
+
         return item
 
     def collate_fn(self, samples):
         batch = {}
         key_1 = ['id','segment_idx']
         key2tensor = ['input_ids',"token_type_ids", 'attention_mask', 'pos_tag']
+        if 'start_idx' in samples[0]:
+            key2tensor.append('start_idx')
+            key2tensor.append('end_idx')
+
         key2pad_tensor = ['pos_tag']
 
         if 'tag_n' in samples[0]:
             key_1.append('tag')
-            key2tensor.append('value')
-            key2pad_tensor.append('value')
+            # key2tensor.append('value')
+            # key2pad_tensor.append('value')
 
             for sample in samples:
-                has_no_tag = [1]
+                # has_no_tag = [1]
+                # if sum(sample["tag_n"])>0:
+                #     has_no_tag = [0]
+                # sample["tag_n"] = has_no_tag + sample["tag_n"]
+                has_no_tag = 1
                 if sum(sample["tag_n"])>0:
-                    has_no_tag = [0]
-                sample["tag_n"] = has_no_tag + sample["tag_n"]
+                    has_no_tag = 0
+                sample["tag_n"][0] = has_no_tag
 
             batch["tag_n"] = torch.tensor([sample["tag_n"] for sample in samples])
             
@@ -64,7 +77,5 @@ class BertDataset(Dataset):
             if key in key2pad_tensor:
                 batch[key] = pad_to_len(batch[key], self.max_text_len) 
             batch[key] = torch.tensor(batch[key])
-
         
-        # print(f"batch['value'].size():{batch['value'].size()}")
         return batch

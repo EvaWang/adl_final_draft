@@ -16,7 +16,6 @@ from rakutenma import RakutenMA
 import sys
 
 rma = RakutenMA() # (default: phi = 2048, c = 0.003906)
-
 tokenizer = BertTokenizer.from_pretrained('cl-tohoku/bert-base-japanese', do_lower_case=True)
 
 def main(args):
@@ -24,7 +23,7 @@ def main(args):
     with open(args.config_path / 'config.json') as f:
         config = json.load(f)
     
-    rma.load(args.config_path / "/model_ja.min.json")
+    rma.load(args.config_path / "model_ja.min.json")
     rma.hash_func = rma.create_hash_func(15)
         
     print(f"config:{config}")
@@ -61,8 +60,6 @@ def normalize_data(df_train, config):
 
     df_train['Text'] = df_train['Text'].map(lambda x: unicodedata.normalize("NFKC", re.sub('＊|\*|\s+', '', x)))
     df_train['Value'] = df_train['Value'].map(lambda x: unicodedata.normalize("NFKC", re.sub('＊|\*|\s+', '', x)) if pd.notnull(x) else '')
-
-    df_train['y'] = df_train.apply(lambda x: [0]*50, axis=1)
 
     return df_train
 
@@ -117,20 +114,53 @@ def map_value(tokenized_text, vals):
     return content_tag.tolist()
 
 # 2-D src_len*20
-def map_valuebyChar(tokenized_text, tags, vals):
-    content_str = "".join(tokenized_text).replace("##","")
-    content_tag = np.zeros((len(tokenized_text),20))
+def map_valuebyTag(tokenized_text, tags, vals):
+    # content_tag = np.zeros((20,2))
+    start_idx = np.zeros(20)
+    end_idx = np.zeros(20)
     for v_i, val in enumerate(vals):
-        tokenized_val = "".join(tokenizer.tokenize(val)).replace("##","")
-        start = content_str.find(tokenized_val)
-        if start<0: 
-            print(content_str)
-            print(tokenized_val)
-            continue
-        end = start+ len(tokenized_val)
-        content_tag[start:end, (tags[v_i]-1)] = 1
+        start = -1
+        end = -1
+        if not val or len(tags)<=v_i:  continue
 
-    return content_tag
+        tokenized_val = "".join(tokenizer.tokenize(val)).replace('##','')
+        for t_i, token in enumerate(tokenized_text):
+            if token.replace('##','') in tokenized_val:
+                for end_i in range(t_i, len(tokenized_text),1):
+                    extract = "".join(tokenized_text[t_i:end_i+1]).replace('##','')
+                    if tokenized_val == extract:
+                        start = t_i
+                        end = end_i+1
+                        break
+            if end>=0: break
+
+        try:
+            start_idx[tags[v_i]] = start
+            end_idx[tags[v_i]] = end
+        except:
+            print("content_tag[tags[v_i]] = [start, end]")
+            print(f"vals:{vals}")
+            print(f"v_i:{v_i}")
+            print(f"tags:{tags}")
+            print(f"check:{len(tags)<=v_i}")
+            
+
+        try:
+            assert start<100
+            assert start>=0
+            assert end<100
+            assert end>=0
+        except:
+            print("start/end out of range")
+            print(f"val:{val}")
+            print(f"tokenized_val:{tokenized_val}")
+            print(len(tokenized_text))
+            print([start, end])
+            print(tokenized_text)
+            print(tags)
+            print(vals)
+        
+    return start_idx.tolist(), end_idx.tolist()
 
 # TODO: read limit from config
 def process_samples(samples, config, is_test=False):
@@ -139,9 +169,9 @@ def process_samples(samples, config, is_test=False):
     stack = []
     content = []
     content_idx = []
-    content_tag = []
+    # content_tag = []
     current_page = samples["ID"][0].split('-')[0]
-    tag_n = np.zeros(20)
+    tag_n = np.zeros(21)
     stop_count = 30
     for i, sample in tqdm(samples.iterrows(), total=samples.shape[0]):
         line_idx = sample["ID"]
@@ -158,7 +188,11 @@ def process_samples(samples, config, is_test=False):
             tag_n = np.logical_or(tag_n, sample['Tag_n'])
             if type(sample["Value"]) != float: 
                 value_list = sample["Value"].split(";")
-                content_tag = content_tag + map_value(tokenized_text, value_list)
+                tag_idx = [(config["tag_map"][t]-1) for t in sample['Tag']]
+                # print(sample["ID"])
+                # print(sample['Tag'])
+                # TODO: 段落組合
+                start_idx, end_idx = map_valuebyTag(tokenized_text, tag_idx,  value_list)
 
          # 組合同段落 
         line_start = len(content)
@@ -182,7 +216,9 @@ def process_samples(samples, config, is_test=False):
                 'pos_tag': tokenized_text_pos,
                 'tag_n': (tag_n*1).tolist(),
                 'tag': sample['Tag'],
-                'value': content_tag
+                'value': "",
+                'start_idx': start_idx, 
+                'end_idx':end_idx
             }
 
             stack.append(item)
@@ -201,8 +237,8 @@ def process_samples(samples, config, is_test=False):
 
             content = []
             content_idx = []
-            tag_n = np.zeros(20)
-            content_tag = []
+            tag_n = np.zeros(21)
+            # content_tag = []
    
     return stack
 
