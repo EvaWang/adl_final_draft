@@ -47,5 +47,5 @@ def check_val(dataset):
 
 if __name__ == '__main__':
 
-    dataset = read_pkl("train_max100")
+    dataset = read_pkl("train_max_100_1")
     check_val(dataset)

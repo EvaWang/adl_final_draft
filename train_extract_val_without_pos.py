@@ -37,8 +37,8 @@ class BertQA(pl.LightningModule):
         self.tag_loss = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(hparams.pos_weight_tag, dtype=torch.float), reduction='none')
 
         # for extract answer
-        self.find_start = nn.Sequential( nn.Dropout(hparams.dropout_rate), nn.Linear(self.bert.config.hidden_size+1, 20))
-        self.find_end = nn.Sequential( nn.Dropout(hparams.dropout_rate), nn.Linear(self.bert.config.hidden_size+1, 20))
+        self.find_start = nn.Sequential( nn.Dropout(hparams.dropout_rate), nn.Linear(self.bert.config.hidden_size, 20))
+        self.find_end = nn.Sequential( nn.Dropout(hparams.dropout_rate), nn.Linear(self.bert.config.hidden_size, 20))
         self.criterion = nn.CrossEntropyLoss(ignore_index=hparams.ignore_index)
 
     def forward(self, input_ids, token_type_ids, attention_mask, pos_tag):
@@ -54,10 +54,10 @@ class BertQA(pl.LightningModule):
         tag_logit = self.classifier(pooler_output)
 
         # for val
-        pos_tag = pos_tag[:,1:-1].unsqueeze(2)
-        hidden_and_tag = torch.cat((last_hidden_state[:,1:-1], pos_tag), 2)
-        val_start = self.find_start(hidden_and_tag)
-        val_end = self.find_end(hidden_and_tag)
+        # pos_tag = pos_tag[:,1:-1].unsqueeze(2)
+        # hidden_and_tag = torch.cat((last_hidden_state[:,1:-1], pos_tag), 2)
+        val_start = self.find_start(last_hidden_state[:,1:-1])
+        val_end = self.find_end(last_hidden_state[:,1:-1])
 
         return has_tag_logit.squeeze(1), tag_logit, val_start, val_end
 
@@ -179,7 +179,7 @@ def main(args):
     print(args)
     print(hparams)
     
-    trainer = pl.Trainer(gpus=[1], max_epochs=32, gradient_clip_val=2, checkpoint_callback=True, early_stop_callback=True)
+    trainer = pl.Trainer(gpus=[0], max_epochs=32, gradient_clip_val=2, checkpoint_callback=True, early_stop_callback=True)
 #     trainer = pl.Trainer(gpus=[0,1], max_epochs=32, checkpoint_callback=True, early_stop_callback=True)
     bertQA = BertQA(hparams)
     print(bertQA)

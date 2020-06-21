@@ -116,8 +116,8 @@ def map_value(tokenized_text, vals):
 # 2-D src_len*20
 def map_valuebyTag(tokenized_text, tags, vals):
     # content_tag = np.zeros((20,2))
-    start_idx = np.zeros(20)
-    end_idx = np.zeros(20)
+    start_idx = np.full(20, -1)
+    end_idx = np.full(20, -1)
     for v_i, val in enumerate(vals):
         start = -1
         end = -1
