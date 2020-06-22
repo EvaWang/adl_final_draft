@@ -24,7 +24,6 @@ class BertDataset(Dataset):
 
         item = {
             'id': self.data[index]['id'],
-            'segment_idx': self.data[index]['segment_idx'],
             'input_ids': self.data[index]["input_ids"],
             'token_type_ids': self.data[index]["token_type_ids"],
             'attention_mask': self.data[index]["attention_mask"],
@@ -34,7 +33,6 @@ class BertDataset(Dataset):
         if 'tag_n' in self.data[index]:
             item['tag'] = self.data[index]['tag']
             item['tag_n'] = self.data[index]['tag_n']
-            item['value'] = self.data[index]['value']
 
         if 'start_idx' in self.data[index]:
             item['start_idx'] = self.data[index]['start_idx']
@@ -44,7 +42,7 @@ class BertDataset(Dataset):
 
     def collate_fn(self, samples):
         batch = {}
-        key_1 = ['id','segment_idx']
+        key_1 = ['id']
         key2tensor = ['input_ids',"token_type_ids", 'attention_mask', 'pos_tag']
         if 'start_idx' in samples[0]:
             key2tensor.append('start_idx')
@@ -54,14 +52,8 @@ class BertDataset(Dataset):
 
         if 'tag_n' in samples[0]:
             key_1.append('tag')
-            # key2tensor.append('value')
-            # key2pad_tensor.append('value')
 
             for sample in samples:
-                # has_no_tag = [1]
-                # if sum(sample["tag_n"])>0:
-                #     has_no_tag = [0]
-                # sample["tag_n"] = has_no_tag + sample["tag_n"]
                 has_no_tag = 1
                 if sum(sample["tag_n"])>0:
                     has_no_tag = 0

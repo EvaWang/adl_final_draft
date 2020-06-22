@@ -41,9 +41,12 @@ def main(args):
     df_train = pd.concat(df_list, axis=0, ignore_index=True)  
     del df_list
 
+    with open(config["parent_text"]) as f:
+        parent_text_list = json.load(f)
+
     logging.info('Creating dataset pickle...')
     create_bert_dataset(
-        process_samples(df_train, config, config["is_testset"]),
+        process_samples_with_parent_text(df_train, parent_text_list, config, config["is_testset"]),
         config["output_filename"],
         config["max_text_len"]
     )
@@ -109,8 +112,7 @@ def map_value(tokenized_text, vals):
     return content_tag.tolist()
 
 # 2-D src_len*20
-def map_valuebyTag(tokenized_text, tags, vals):
-    # content_tag = np.zeros((20,2))
+def map_valuebyTag(tokenized_text, tags, vals, val_start=0):
     start_idx = np.full(20, -1)
     end_idx = np.full(20, -1)
     for v_i, val in enumerate(vals):
@@ -130,8 +132,8 @@ def map_valuebyTag(tokenized_text, tags, vals):
             if end>=0: break
 
         try:
-            start_idx[tags[v_i]] = start
-            end_idx[tags[v_i]] = end
+            start_idx[tags[v_i]] = start+val_start
+            end_idx[tags[v_i]] = end+val_start
         except:
             print("content_tag[tags[v_i]] = [start, end]")
             print(f"vals:{vals}")
@@ -139,25 +141,23 @@ def map_valuebyTag(tokenized_text, tags, vals):
             print(f"tags:{tags}")
             print(f"check:{len(tags)<=v_i}")
             
-
-        try:
-            assert start<100
-            assert start>=0
-            assert end<100
-            assert end>=0
-        except:
-            print("start/end out of range")
-            print(f"val:{val}")
-            print(f"tokenized_val:{tokenized_val}")
-            print(len(tokenized_text))
-            print([start, end])
-            print(tokenized_text)
-            print(tags)
-            print(vals)
+        # try:
+        #     assert start<100
+        #     assert start>=0
+        #     assert end<100
+        #     assert end>=0
+        # except:
+        #     print("start/end out of range")
+        #     print(f"val:{val}")
+        #     print(f"tokenized_val:{tokenized_val}")
+        #     print(len(tokenized_text))
+        #     print([start, end])
+        #     print(tokenized_text)
+        #     print(tags)
+        #     print(vals)
         
-    return start_idx.tolist(), end_idx.tolist()
+    return start_idx, end_idx
 
-# TODO: read limit from config
 def process_samples(samples, config, is_test=False):
     samples = normalize_data(samples, config)
 
@@ -168,7 +168,6 @@ def process_samples(samples, config, is_test=False):
     # content_tag = []
     current_page = samples["ID"][0].split('-')[0]
     tag_n = np.zeros(21)
-    stop_count = 30
     for i, sample in tqdm(samples.iterrows(), total=samples.shape[0]):
         line_idx = sample["ID"]
         is_title = True # 不分段
@@ -208,8 +207,8 @@ def process_samples(samples, config, is_test=False):
                 'tag_n': (tag_n*1).tolist(),
                 'tag': sample['Tag'],
                 'value': "",
-                'start_idx': start_idx, 
-                'end_idx':end_idx
+                'start_idx': start_idx.tolist(), 
+                'end_idx':end_idx.tolist()
             }
 
             stack.append(item)
@@ -230,7 +229,50 @@ def process_samples(samples, config, is_test=False):
             content_token = []
             content_idx = []
             tag_n = np.zeros(21)
-            # content_tag = []
+   
+    return stack
+
+def process_samples_with_parent_text(samples, parent_text_list, config, is_test=False):
+    samples = normalize_data(samples, config)
+
+    stack = []
+    for i, sample in tqdm(samples.iterrows(), total=samples.shape[0]):
+        line_idx = sample["ID"]
+        tag_n = sample['Tag_n']
+
+        content_index = parent_text_list["id2content"][line_idx]
+        parent_text = parent_text_list["content_list"][f"content_{content_index['index']}"]
+
+        tokenized_text = tokenizer.tokenize(sample["Text"])
+        if is_test == False:
+            if type(sample["Value"]) != float: 
+                value_list = sample["Value"].split(";")
+                tag_idx = [(config["tag_map"][t]-1) for t in sample['Tag']]
+                start_idx, end_idx = map_valuebyTag(tokenized_text, tag_idx,  value_list, content_index["start"])
+                for v_i in range(20):
+                    # 超出max_len的清掉
+                    if start_idx[v_i]>500:
+                        start_idx[v_i] = -1
+                        tag_n[v_i] = 0
+                    if end_idx[v_i]>500:
+                        end_idx[v_i] = -1
+                        tag_n[v_i] = 0
+
+        # 先清空前面的content、content_idx
+        # tokenized_text_pos = map_pos(parent_text["token"], config["pos_map"])
+        item = {
+            'id': line_idx,
+            'input_ids': parent_text["input_ids"],
+            'token_type_ids': parent_text["token_type_ids"],
+            'attention_mask': parent_text["attention_mask"],
+            'pos_tag': parent_text["tokenized_text_pos"],
+            'tag_n': tag_idx,
+            'tag': sample['Tag'],
+            'start_idx': tag_n, 
+            'end_idx':end_idx
+        }
+
+        stack.append(item)
    
     return stack
 
