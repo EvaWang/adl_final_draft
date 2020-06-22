@@ -45,44 +45,30 @@ def prediction(args):
         end = end.permute(0,2,1)
         batch_size = len(batch['id'])
         for index in range(batch_size):
+            tag_and_val = []
             tag_name = []
             if hastag[index].item()>0.5:
                 tag_name.append("NONE")
-            # else:
-            #     tags = (predict_tag[index]>0).nonzero().tolist()
-            #     tag_name = tag_name + [ tag_name for tag_name in tag_map if ([tag_map[tag_name]-1] in tags)]
-            #     for t_i, tag in enumerate(tags):
+            else:
+                tags = (predict_tag[index]>0).nonzero().tolist()
+                tag_name = tag_name + [ tag_name for tag_name in tag_map if ([tag_map[tag_name]-1] in tags)]
+                for t_i, tag in enumerate(tags):
+                    p_start, start_index = torch.topk(start[index][tag], 1)
+                    p_end, end_index = torch.topk(end[index][tag], 1)
+                    ans_token = batch['input_ids'][index][start_index[0]:end_index[0]+1]
+                    ans_text = tokenizer.decode(ans_token, skip_special_tokens=True).replace("##","").replace(" ","")
+                    if ans_text:
+                        tag_and_val.append(f"{tag_name[t_i]}:{ans_text}")
 
-            #         p_start, start_index = torch.topk(start[index][tag], 1)
-            #         p_end, end_index = torch.topk(end[index][tag], 1)
-            #         ans_token = batch['input_ids'][index][start_index[0]:end_index[0]+1]
-            #         ans_text = tokenizer.decode(ans_token, skip_special_tokens=True).replace("##","").replace(" ","")
-            #         tag_name[t_i] = f"{tag_name[t_i]}:{ans_text}"
+            if len(tag_and_val) ==0:
+                tag_and_val.append("NONE")
                     
             ans.append({
                 "ID":batch["segment_idx"][index][0][0], 
-                "Prediction": " ".join(tag_name),
+                "Prediction": " ".join(tag_and_val),
                 "Check": "",
                 "Check2": "",
             })
-
-        #     break
-        # break
-
-            # top_5_prob, top5_index = torch.topk(tag[index], 5)
-            # tag_list = []
-            # for i in range(5):
-            #     val = top_5_prob[i].item() #TODO
-            #     if val <1: break
-
-            #     tag_idx = top5_index[i].item()+1
-            #     tag_name = [ t for t in tag_map if tag_idx==tag_map[t]]
-            #     tag_list.append(f"{tag_name[-1]}:")
-            
-            # ans_text = f"{batch['id'][index]},{(' ').join(tag_list)}\n"
-            # ans.append(ans_text)
-        # break # for test
-
     return ans
 
 
@@ -92,10 +78,10 @@ def _parse_args():
         description="Run Bert finetune for qa"
     )
 
-    parser.add_argument('--model_path', type=str, help='model_path', default="./lightning_logs/version_37/checkpoints/epoch=1.ckpt")
+    parser.add_argument('--model_path', type=str, help='model_path', default="./lightning_logs/version_39/checkpoints/epoch=1.ckpt")
     parser.add_argument('--config_path', type=str, help='config_path', default="./dataset/config.json")
     parser.add_argument('--dataset_path', type=str, help='dataset_path', default="./dataset/dev_max_100_1.pkl")
-    parser.add_argument('--predict_path', type=str, help='predict_path', default="./test_0622_37_none_or_empty.csv")
+    parser.add_argument('--predict_path', type=str, help='predict_path', default="./test_0622_39.csv")
     parser.add_argument('--debug', type=bool, help='debug info', default=False)
     parser.add_argument('--tag_threshold', type=float, help='tag_threshold', default=0)
 

@@ -41,11 +41,6 @@ def main(args):
     df_train = pd.concat(df_list, axis=0, ignore_index=True)  
     del df_list
 
-    # samples = normalize_data(df_train, config)
-    # tagged_num = sum([ len(t) for t in df_train['Tag']])
-    # total = len(df_train['Tag'])*20
-    # print(f"tagged/untagged weight:{(total-tagged_num)/tagged_num}")
-
     logging.info('Creating dataset pickle...')
     create_bert_dataset(
         process_samples(df_train, config, config["is_testset"]),
@@ -167,7 +162,8 @@ def process_samples(samples, config, is_test=False):
     samples = normalize_data(samples, config)
 
     stack = []
-    content = []
+    content = ""
+    content_token = []
     content_idx = []
     # content_tag = []
     current_page = samples["ID"][0].split('-')[0]
@@ -176,12 +172,6 @@ def process_samples(samples, config, is_test=False):
     for i, sample in tqdm(samples.iterrows(), total=samples.shape[0]):
         line_idx = sample["ID"]
         is_title = True # 不分段
-        # try:
-        #     # 下一個是title則前面內容清空
-        #     is_title = True if type(samples["Is Title"][i+1]) != float else False
-        # except:
-        #     # 最後一行
-        #     is_title = True
 
         tokenized_text = tokenizer.tokenize(sample["Text"])
         if is_test == False:
@@ -195,20 +185,21 @@ def process_samples(samples, config, is_test=False):
                 start_idx, end_idx = map_valuebyTag(tokenized_text, tag_idx,  value_list)
 
          # 組合同段落 
-        line_start = len(content)
-        content = content + tokenized_text
-        line_end = len(content)
+        line_start = len(content_token)
+        content = content + sample["Text"]
+        content_token = content_token + tokenized_text
+        line_end = len(content_token)
         content_idx.append([line_idx, line_start, line_end])
         # 組合同段落完畢
 
-        if (is_title or current_page != line_idx.split('-')[0]) and len(content)>0:
+        if (is_title or current_page != line_idx.split('-')[0]) and len(content_token)>0:
             # 先清空前面的content、content_idx
-            tokenized_text_pos = map_pos(content, config["pos_map"])
+            tokenized_text_pos = map_pos(content_token, config["pos_map"])
             current_page = line_idx.split('-')[0]
-            tokenized_text_encode = tokenizer.encode_plus("".join(content), pad_to_max_length=True, return_attention_mask=True, return_token_type_ids=True, max_length=config["max_text_len"])
+            tokenized_text_encode = tokenizer.encode_plus(content, pad_to_max_length=True, return_attention_mask=True, return_token_type_ids=True, max_length=config["max_text_len"])
             item = {
                 'id': i,
-                'content': content,
+                'content': content_token,
                 'segment_idx':content_idx,
                 'input_ids': tokenized_text_encode["input_ids"],
                 'token_type_ids': tokenized_text_encode["token_type_ids"],
@@ -235,7 +226,8 @@ def process_samples(samples, config, is_test=False):
             #     print(f'tag_n:       {item["tag_n"]}')
             #     print(f'value:       {item["value"]}')
 
-            content = []
+            content = ""
+            content_token = []
             content_idx = []
             tag_n = np.zeros(21)
             # content_tag = []
