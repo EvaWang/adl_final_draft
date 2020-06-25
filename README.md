@@ -1,8 +1,15 @@
 ## 實驗記錄
-1. lr:0.0005, avg_loss: ,f1: *TODO*, memo: Sigmoid, BCEWithLogitsLoss , v_num=42
-2. lr:0.0005, avg_loss: ,f1: *TODO*, memo: 拿掉Sigmoid, BCEWithLogitsLoss , v_num=43
-3. lr:0.0005, avg_loss: ,f1: *TODO*, memo: 前面weight都錯了 , v_num=44
+1. v_num=54, lr: 1.0e-05,dev-score:0.9184137546699499,  memo: 單行訓練，lr太大會沒有結果
+2. 
 
+
+
+## 實驗想法 用QA做
+[Content][SEP][TAG_1]...[TAG_n][SEP]
+[有答案/沒答案]
+分20次train?
+一次train?
+POS用途？
 
 Python 3.7.5
 

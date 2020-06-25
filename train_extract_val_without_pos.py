@@ -43,7 +43,7 @@ class BertQA(pl.LightningModule):
 
     def forward(self, input_ids, token_type_ids, attention_mask, pos_tag):
 
-        last_hidden_state, pooler_output, attentions = self.bert(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)
+        last_hidden_state, pooler_output, _ = self.bert(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)
         # note
         # last_hidden_state: (batch_size, sequence_length, hidden_size)
         # pooler_output: (batch_size, hidden_size)
@@ -56,8 +56,8 @@ class BertQA(pl.LightningModule):
         # for val
         # pos_tag = pos_tag[:,1:-1].unsqueeze(2)
         # hidden_and_tag = torch.cat((last_hidden_state[:,1:-1], pos_tag), 2)
-        val_start = self.find_start(last_hidden_state[:,1:-1])
-        val_end = self.find_end(last_hidden_state[:,1:-1])
+        val_start = self.find_start(last_hidden_state[:,422:])
+        val_end = self.find_end(last_hidden_state[:,422:])
 
         return has_tag_logit.squeeze(1), tag_logit, val_start, val_end
 
@@ -74,12 +74,21 @@ class BertQA(pl.LightningModule):
 
         return loss_has_tag+loss.mean()
 
-    def _calculate_val_loss(self, start_hat, end_hat, start, end, token_type_ids, attention_mask):
-
+    def _calculate_val_loss(self, start_hat, end_hat, start, end, attention_mask):
+        # [batch_size, src_len, 20]
         # mask out paddings, [cls]/[sep] is already cut
-        mask = torch.logical_xor(token_type_ids[:,1:-1], attention_mask[:,1:-1])
-        mask = torch.logical_not(mask).unsqueeze(2).repeat(1,1,20)
+        batch_size = start_hat.size(0)
+        src_len = start_hat.size(1)
 
+        start_hat = start_hat.permute(0,2,1)
+        end_hat = end_hat.permute(0,2,1)
+
+        mask = torch.logical_not(attention_mask[:,422:]).repeat(1,20).view(20*batch_size,-1) 
+        start_hat = start_hat.reshape(-1, src_len)
+        end_hat = end_hat.reshape(-1, src_len)
+        start = start.view(-1)
+        end = end.view(-1)
+      
         start_hat = start_hat.masked_fill_(mask, float("-inf"))
         end_hat = end_hat.masked_fill_(mask, float("-inf"))
 
@@ -89,6 +98,7 @@ class BertQA(pl.LightningModule):
         total_loss = loss_start+loss_end 
         # 答案應該在[0, max_len]之間 cross entropy class 超過噴nan/inf
         if math.isnan(total_loss) or math.isinf(total_loss):
+            print(attention_mask[:,422:])
             print(start)
             print(end)
             print(loss_start)
@@ -100,21 +110,17 @@ class BertQA(pl.LightningModule):
     def training_step(self, batch, batch_nb):
         input_ids, token_type_ids, attention_mask, pos_tag, tag_n = self._unpack_batch(batch)
         has_tag_logit, logit_tag, val_start, val_end = self.forward(input_ids, token_type_ids, attention_mask, pos_tag)
-        # logit_tag, logit_start, logit_end = self.forward(input_ids, token_type_ids, attention_mask, pos_tag)
 
         loss_tag = self._calculate_tag_loss(has_tag_logit, logit_tag, tag_n)
-        # return {'loss': loss_tag}
-        loss_val = self._calculate_val_loss(val_start, val_end, batch["start_idx"], batch["end_idx"], token_type_ids, attention_mask)
+        loss_val = self._calculate_val_loss(val_start, val_end, batch["start_idx"], batch["end_idx"], attention_mask)
         return {'loss': loss_tag+loss_val}
 
     def validation_step(self, batch, batch_nb):
         input_ids, token_type_ids, attention_mask, pos_tag, tag_n = self._unpack_batch(batch)
         has_tag_logit, logit_tag, val_start, val_end = self.forward(input_ids, token_type_ids, attention_mask, pos_tag)
-        # logit_tag, logit_val = self.forward(input_ids, token_type_ids, attention_mask, pos_tag)
 
         loss_tag = self._calculate_tag_loss(has_tag_logit, logit_tag, tag_n)
-        # return {'val_loss': loss_tag}
-        loss_val = self._calculate_val_loss(val_start, val_end, batch["start_idx"], batch["end_idx"], token_type_ids, attention_mask)
+        loss_val = self._calculate_val_loss(val_start, val_end, batch["start_idx"], batch["end_idx"], attention_mask)
         return {'val_loss': loss_tag+loss_val}
 
     def validation_epoch_end(self, outputs):
@@ -155,16 +161,16 @@ class BertQA(pl.LightningModule):
                           collate_fn=dataset.collate_fn)
 
 hparams = Namespace(**{
-    'train_dataset_path': "./dataset/train_max100.pkl",
-    'valid_dataset_path': "./dataset/dev_max100.pkl",
+    'train_dataset_path': "./dataset/train_with_parent_text_1.pkl",
+    'valid_dataset_path': "./dataset/dev_with_parent_text_1.pkl",
     'batch_size': 4,
     'learning_rate': 0.00005,
     'dropout_rate':0.2,
-    'num_workers':2,
+    'num_workers':4,
     'ignore_index':-1,
     'pos_weight_has_tag': [6.92],
     'pos_weight_tag': [163.17, 163.17, 116.26, 163.17, 146.01, 132.11, 128.61, 119.12, 184.85, 819.83, 141.75, 222.86, 119.12, 35.08, 79.08, 110.93, 72.51, 75.95, 48.50, 55.61],
-    'max_len':100
+    'max_len':89 # 目前用不到
 })
 
 def _parse_args():
@@ -179,7 +185,7 @@ def main(args):
     print(args)
     print(hparams)
     
-    trainer = pl.Trainer(gpus=[0], max_epochs=32, gradient_clip_val=2, checkpoint_callback=True, early_stop_callback=True)
+    trainer = pl.Trainer(gpus=[1], max_epochs=32, gradient_clip_val=2, checkpoint_callback=True, early_stop_callback=True)
 #     trainer = pl.Trainer(gpus=[0,1], max_epochs=32, checkpoint_callback=True, early_stop_callback=True)
     bertQA = BertQA(hparams)
     print(bertQA)

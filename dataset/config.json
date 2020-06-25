@@ -1,10 +1,13 @@
 {
-    "max_text_len": 512,
-    "max_content_len": 480,
-    "max_question_len": 29,
+    "max_text_len": 100, 
+    "target_max_len": 91,
     "lower_case": true,
-    "data_folder": "./release/train/ca_data",
+    "data_folder": "./release2/train/ca_data",
+    "output_filename":"./dataset/train_max_100_2.pkl",
+    "parent_text":"./dataset/train_combine_content.json",
+    "is_testset": false,
     "tag_map" : {
+        "NONE": 0,
         "調達年度": 1,
         "都道府県": 2,
         "入札件名": 3,

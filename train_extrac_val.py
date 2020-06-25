@@ -103,17 +103,14 @@ class BertQA(pl.LightningModule):
         # logit_tag, logit_start, logit_end = self.forward(input_ids, token_type_ids, attention_mask, pos_tag)
 
         loss_tag = self._calculate_tag_loss(has_tag_logit, logit_tag, tag_n)
-        # return {'loss': loss_tag}
         loss_val = self._calculate_val_loss(val_start, val_end, batch["start_idx"], batch["end_idx"], token_type_ids, attention_mask)
         return {'loss': loss_tag+loss_val}
 
     def validation_step(self, batch, batch_nb):
         input_ids, token_type_ids, attention_mask, pos_tag, tag_n = self._unpack_batch(batch)
         has_tag_logit, logit_tag, val_start, val_end = self.forward(input_ids, token_type_ids, attention_mask, pos_tag)
-        # logit_tag, logit_val = self.forward(input_ids, token_type_ids, attention_mask, pos_tag)
 
         loss_tag = self._calculate_tag_loss(has_tag_logit, logit_tag, tag_n)
-        # return {'val_loss': loss_tag}
         loss_val = self._calculate_val_loss(val_start, val_end, batch["start_idx"], batch["end_idx"], token_type_ids, attention_mask)
         return {'val_loss': loss_tag+loss_val}
 
@@ -155,10 +152,10 @@ class BertQA(pl.LightningModule):
                           collate_fn=dataset.collate_fn)
 
 hparams = Namespace(**{
-    'train_dataset_path': "./dataset/train_max100.pkl",
-    'valid_dataset_path': "./dataset/dev_max100.pkl",
+    'train_dataset_path': "./dataset/train_max_100_2.pkl",
+    'valid_dataset_path': "./dataset/dev_max_100_2.pkl",
     'batch_size': 4,
-    'learning_rate': 0.00005,
+    'learning_rate': 0.00001,
     'dropout_rate':0.2,
     'num_workers':2,
     'ignore_index':-1,
@@ -178,8 +175,10 @@ def _parse_args():
 def main(args):
     print(args)
     print(hparams)
+
+    early_stop_callback = EarlyStopping(patience=3)
     
-    trainer = pl.Trainer(gpus=[1], max_epochs=32, gradient_clip_val=2, checkpoint_callback=True, early_stop_callback=True)
+    trainer = pl.Trainer(gpus=[0], max_epochs=32, gradient_clip_val=2, checkpoint_callback=True, early_stop_callback=early_stop_callback)
 #     trainer = pl.Trainer(gpus=[0,1], max_epochs=32, checkpoint_callback=True, early_stop_callback=True)
     bertQA = BertQA(hparams)
     print(bertQA)

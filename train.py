@@ -52,7 +52,6 @@ class BertQA(pl.LightningModule):
         # for tag
         has_tag_logit = self.has_tag(pooler_output)
         tag_logit = self.classifier(pooler_output)
-        # tag_logit = self.classifier(last_hidden_state[:,0])
         return has_tag_logit.squeeze(1), tag_logit
 
     def _unpack_batch(self, batch):

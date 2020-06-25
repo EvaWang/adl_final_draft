@@ -12,7 +12,7 @@ from rakutenma import RakutenMA
 
 
 from transformers import BertTokenizer
-tokenizer = BertTokenizer.from_pretrained('cl-tohoku/bert-base-japanese', do_lower_case=True)
+tokenizer = BertTokenizer.from_pretrained('cl-tohoku/bert-base-japanese', do_lower_case=False)
 
 rma = RakutenMA() # (default: phi = 2048, c = 0.003906)
 
@@ -74,17 +74,18 @@ def combine_lines(samples, config):
 
         if (is_title or current_page != line_idx.split('-')[0]) and len(content)>0:
             # 先清空前面的content、content_idx
-            tokenized_text_encode = tokenizer.encode_plus(content, pad_to_max_length=True, return_attention_mask=True, return_token_type_ids=True, max_length=config["max_text_len"])
+            # tokenized_text_encode = tokenizer.encode_plus(content, pad_to_max_length=True, return_attention_mask=True, return_token_type_ids=True, max_length=config["max_text_len"])
             current_page = line_idx.split('-')[0]
             content_token = tokenizer.tokenize(content)
-            tokenized_text_pos = map_pos(content_token, config["pos_map"])
+            # tokenized_text_pos = map_pos(content_token, config["pos_map"])
 
             stack[ f'content_{i}'] = {
+                'content_text':content,
                 'token':content_token, 
-                'tokenized_text_pos':tokenized_text_pos,
-                'input_ids': tokenized_text_encode["input_ids"],
-                'token_type_ids': tokenized_text_encode["token_type_ids"],
-                'attention_mask': tokenized_text_encode["attention_mask"],
+                # 'tokenized_text_pos':tokenized_text_pos,
+                # 'input_ids': tokenized_text_encode["input_ids"],
+                # 'token_type_ids': tokenized_text_encode["token_type_ids"],
+                # 'attention_mask': tokenized_text_encode["attention_mask"],
                 }
             for idx, s, e in content_idx:
                 id2content[idx] = {'index': i, 'start':s, 'end':e}

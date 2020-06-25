@@ -5,10 +5,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
 from BertDataset import BertDataset as dataset
-from transformers import (
-    BertModel,
-    BertTokenizer
-)
+from transformers import BertTokenizer
 
 # from train import BertQA 
 from train_extrac_val import BertQA 
@@ -29,46 +26,54 @@ def prediction(args):
         config = json.load(f)
 
     tag_map = config["tag_map"]
-    # answerable_threshold = args.answerable_threshold
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # load model
     pretrained_model = BertQA.load_from_checkpoint(checkpoint_path=args.model_path).to(device)
     pretrained_model.freeze()
 
-    tokenizer = BertTokenizer.from_pretrained('cl-tohoku/bert-base-japanese', do_lower_case=True)
+    tokenizer = BertTokenizer.from_pretrained('cl-tohoku/bert-base-japanese', do_lower_case=False)
     dataloader = pretrained_model.user_dataloader(args.dataset_path)
 
     ans = []
+    # for batch in dataloader:
     for batch in tqdm(dataloader):
         hastag, predict_tag, start, end = pretrained_model(batch['input_ids'].to(device), batch['token_type_ids'].to(device), batch['attention_mask'].to(device), batch["pos_tag"].float().to(device))
         start = start.permute(0,2,1)
         end = end.permute(0,2,1)
         batch_size = len(batch['id'])
+        ans_range = []
         for index in range(batch_size):
             tag_and_val = []
             tag_name = []
-            if hastag[index].item()>0.5:
+            ans_item = {}
+            
+            if hastag[index].item()>0:
                 tag_name.append("NONE")
             else:
                 tags = (predict_tag[index]>0).nonzero().tolist()
+
+                
+                for p_i, p_val in enumerate(predict_tag[index].tolist()):
+                    ans_item[f"{p_i}"] = p_val
+                
                 tag_name = tag_name + [ tag_name for tag_name in tag_map if ([tag_map[tag_name]-1] in tags)]
                 for t_i, tag in enumerate(tags):
                     p_start, start_index = torch.topk(start[index][tag], 1)
                     p_end, end_index = torch.topk(end[index][tag], 1)
-                    ans_token = batch['input_ids'][index][start_index[0]:end_index[0]+1]
-                    ans_text = tokenizer.decode(ans_token, skip_special_tokens=True).replace("##","").replace(" ","")
+                    content_ids = batch['input_ids'][index][1:]
+                    ans_token = content_ids[start_index[0].item():end_index[0].item()+1]
+                    ans_text = tokenizer.decode(ans_token, skip_special_tokens=True).replace(" ","").replace("##","")
                     if ans_text:
                         tag_and_val.append(f"{tag_name[t_i]}:{ans_text}")
+                        ans_range.append(f"{start_index.item()}-{end_index.item()}")
 
             if len(tag_and_val) ==0:
                 tag_and_val.append("NONE")
-                    
-            ans.append({
-                "ID":batch["segment_idx"][index][0][0], 
-                "Prediction": " ".join(tag_and_val),
-                "Check": "",
-                "Check2": "",
-            })
+
+            ans_item["ID"] =  batch["id"][index]
+            ans_item["Prediction"] =  " ".join(tag_and_val)
+                        
+            ans.append(ans_item)
     return ans
 
 
@@ -78,10 +83,10 @@ def _parse_args():
         description="Run Bert finetune for qa"
     )
 
-    parser.add_argument('--model_path', type=str, help='model_path', default="./lightning_logs/version_39/checkpoints/epoch=1.ckpt")
+    parser.add_argument('--model_path', type=str, help='model_path', default="./lightning_logs/version_54/checkpoints/epoch=1.ckpt")
     parser.add_argument('--config_path', type=str, help='config_path', default="./dataset/config.json")
-    parser.add_argument('--dataset_path', type=str, help='dataset_path', default="./dataset/dev_max_100_1.pkl")
-    parser.add_argument('--predict_path', type=str, help='predict_path', default="./test_0622_39.csv")
+    parser.add_argument('--dataset_path', type=str, help='dataset_path', default="./dataset/dev_max_100_2.pkl")
+    parser.add_argument('--predict_path', type=str, help='predict_path', default="./test_54_1.csv")
     parser.add_argument('--debug', type=bool, help='debug info', default=False)
     parser.add_argument('--tag_threshold', type=float, help='tag_threshold', default=0)
 
@@ -92,9 +97,11 @@ def main(args):
     print(args)
     
     ans_list = prediction(args)
+    # csv_header = ["ID", "Prediction", "Check",  "Check2"]
+    csv_header = ["ID", "Prediction", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"]
 
     with open(args.predict_path, "w") as csvfile:
-        writer = csv.DictWriter(csvfile, ["ID", "Prediction", "Check",  "Check2"])
+        writer = csv.DictWriter(csvfile, csv_header)
         writer.writeheader()
         writer.writerows(ans_list)
     

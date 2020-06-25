@@ -28,11 +28,13 @@ class BertDataset(Dataset):
             'token_type_ids': self.data[index]["token_type_ids"],
             'attention_mask': self.data[index]["attention_mask"],
             'pos_tag': self.data[index]["pos_tag"],
+            'content': self.data[index]["content"],
         }
 
         if 'tag_n' in self.data[index]:
             item['tag'] = self.data[index]['tag']
             item['tag_n'] = self.data[index]['tag_n']
+            item['value'] = self.data[index]['value']
 
         if 'start_idx' in self.data[index]:
             item['start_idx'] = self.data[index]['start_idx']
@@ -53,11 +55,11 @@ class BertDataset(Dataset):
         if 'tag_n' in samples[0]:
             key_1.append('tag')
 
-            for sample in samples:
-                has_no_tag = 1
-                if sum(sample["tag_n"])>0:
-                    has_no_tag = 0
-                sample["tag_n"][0] = has_no_tag
+            # for sample in samples:
+            #     has_no_tag = 1
+            #     if sum(sample["tag_n"])>0:
+            #         has_no_tag = 0
+            #     sample["tag_n"][0] = has_no_tag
 
             batch["tag_n"] = torch.tensor([sample["tag_n"] for sample in samples])
             
