@@ -54,8 +54,8 @@ class BertQA(pl.LightningModule):
         tag_logit = self.classifier(pooler_output)
 
         # for val
-        pos_tag = pos_tag[:,1:-1].unsqueeze(2)
-        hidden_and_tag = torch.cat((last_hidden_state[:,1:-1], pos_tag), 2)
+        pos_tag = pos_tag[:,1:-1].unsqueeze(2) # 加了parent也不變
+        hidden_and_tag = torch.cat((last_hidden_state[:,1:101], pos_tag), 2)
         val_start = self.find_start(hidden_and_tag)
         val_end = self.find_end(hidden_and_tag)
 
@@ -77,7 +77,7 @@ class BertQA(pl.LightningModule):
     def _calculate_val_loss(self, start_hat, end_hat, start, end, token_type_ids, attention_mask):
 
         # mask out paddings, [cls]/[sep] is already cut
-        mask = torch.logical_xor(token_type_ids[:,1:-1], attention_mask[:,1:-1])
+        mask = torch.logical_xor(token_type_ids[:,1:101], attention_mask[:,1:101])
         mask = torch.logical_not(mask).unsqueeze(2).repeat(1,1,20)
 
         start_hat = start_hat.masked_fill_(mask, float("-inf"))
@@ -152,11 +152,11 @@ class BertQA(pl.LightningModule):
                           collate_fn=dataset.collate_fn)
 
 hparams = Namespace(**{
-    'train_dataset_path': "./dataset/train_max_100_2.pkl",
-    'valid_dataset_path': "./dataset/dev_max_100_2.pkl",
+    'train_dataset_path': "./dataset/train_max_512.pkl",
+    'valid_dataset_path': "./dataset/dev_max_512.pkl",
     'batch_size': 4,
     'learning_rate': 0.00001,
-    'dropout_rate':0.2,
+    'dropout_rate':0.5,
     'num_workers':2,
     'ignore_index':-1,
     'pos_weight_has_tag': [6.92],

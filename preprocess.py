@@ -45,11 +45,17 @@ def main(args):
         parent_text_list = json.load(f)
 
     logging.info('Creating dataset pickle...')
+    
+    # create_bert_dataset(
+    #     process_samples(df_train, config, config["is_testset"]),
+    #     config["output_filename"],
+    #     config["max_text_len"]
+    # )
+
     create_bert_dataset(
-        process_samples(df_train, config, config["is_testset"]),
-        # process_samples_with_parent_text(df_train, parent_text_list, config, config["is_testset"]),
+        process_samples_with_parent_text(df_train, parent_text_list, config, config["is_testset"]),
         config["output_filename"],
-        config["max_text_len"]
+        config["target_max_len"]+2
     )
 
 # clean and normalization
@@ -135,30 +141,12 @@ def map_valuebyTag(tokenized_text, tags, vals):
         try:
             start_idx[tags[v_i]] = start
             end_idx[tags[v_i]] = end
-            # extracted_ans = "".join(tokenized_text[start:end+1]).replace('##','')
-            # print(extracted_ans)
-            # assert  extracted_ans == tokenized_val
         except:
             print("content_tag[tags[v_i]] = [start, end]")
             print(f"vals:{vals}")
             print(f"v_i:{v_i}")
             print(f"tags:{tags}")
             print(f"check:{len(tags)<=v_i}")
-            
-        # try:
-        #     assert start<100
-        #     assert start>=0
-        #     assert end<100
-        #     assert end>=0
-        # except:
-        #     print("start/end out of range")
-        #     print(f"val:{val}")
-        #     print(f"tokenized_val:{tokenized_val}")
-        #     print(len(tokenized_text))
-        #     print([start, end])
-        #     print(tokenized_text)
-        #     print(tags)
-        #     print(vals)
         
     return start_idx, end_idx
 
@@ -199,64 +187,70 @@ def process_samples(samples, config, is_test=False):
         }
 
         stack.append(item)
-            # # debug
-            # stop_count = stop_count -1
-            # if stop_count<0:
-            #     sys.exit()
-            # else:
-            #     pass
-            #     print(f'content:     {content}')
-            #     print(f'segment_idx: {item["segment_idx"]}')
-            #     print(f'input_ids:   {item["input_ids"]}')
-            #     print(f'pos_tag:     {item["pos_tag"]}')
-            #     print(f'tag_n:       {item["tag_n"]}')
-            #     print(f'value:       {item["value"]}')
 
     return stack
 
 def process_samples_with_parent_text(samples, parent_text_list, config, is_test=False):
     samples = normalize_data(samples, config)
-    target_max_len = config["target_max_len"]
+    target_max_len = config["target_max_len"]+2 # [CLS][SEP]
     max_text_len = config["max_text_len"]
 
     stack = []
     for i, sample in tqdm(samples.iterrows(), total=samples.shape[0]):
-        line_idx = sample["ID"]
-        tag_n = sample['Tag_n']
-
-        content_index = parent_text_list["id2content"][line_idx]
-        parent_text = parent_text_list["content_list"][f"content_{content_index['index']}"]
-
+        tag_n = []
+        value_list = sample["Value"]
         tokenized_text = tokenizer.tokenize(sample["Text"])
-        if is_test == False:
-            if type(sample["Value"]) != float: 
-                value_list = sample["Value"].split(";")
-                tag_idx = [(config["tag_map"][t]-1) for t in sample['Tag']]
-                start_idx, end_idx = map_valuebyTag(tokenized_text[:target_max_len], tag_idx,  value_list)
-
-        context_token_ids = tokenizer.encode_plus(parent_text["content_text"], pad_to_max_length=True, return_attention_mask=True, return_token_type_ids=True, max_length=(max_text_len-target_max_len+1))
-        target_token_ids = tokenizer.encode_plus(sample["Text"], pad_to_max_length=True, return_attention_mask=True, return_token_type_ids=True, max_length=target_max_len)
-
-        combine_inputs = context_token_ids['input_ids']+target_token_ids['input_ids'][1:]
-        combine_type_ids = context_token_ids['token_type_ids']+target_token_ids['attention_mask'][1:]
-        combine_attn_masks = context_token_ids['attention_mask']+target_token_ids['attention_mask'][1:]
+        if is_test == False and type(sample["Value"]) != float:
+            tag_idx = [(config["tag_map"][t]-1) for t in sample['Tag']]
+            value_list = sample["Value"].split(";")
+            if len(value_list)!= len(tag_idx):
+                value_list = value_list* len(tag_idx)
+            start_idx, end_idx = map_valuebyTag(tokenized_text, tag_idx,  value_list)
+            tag_n = sample['Tag_n']
+            if sum(tag_n) == 0:
+                tag_n[0] = 1
+            else:
+                tag_n[0] = 0
 
         tokenized_text_pos = map_pos(tokenized_text, config["pos_map"])
+        tokenized_text_encode = tokenizer.encode_plus(
+            sample["Text"], 
+            pad_to_max_length=True, 
+            return_attention_mask=True, 
+            return_token_type_ids=True, 
+            max_length=target_max_len # 102 [CLS]xxxxx[SEP]
+        )
+        
+        # 在後面加上parent text
+        content_index = parent_text_list["id2content"][sample["ID"]]
+        parent_text = parent_text_list["content_list"][f"content_{content_index['index']}"]
+        context_token_ids = tokenizer.encode_plus(
+            parent_text["content_text"], 
+            pad_to_max_length=True, 
+            return_attention_mask=True, 
+            return_token_type_ids=True, 
+            max_length=(max_text_len-target_max_len+1) # 512-102+1=411
+        )
+
+        combine_inputs = tokenized_text_encode['input_ids']+context_token_ids['input_ids'][1:]
+        combine_type_ids = tokenized_text_encode['token_type_ids']+context_token_ids['attention_mask'][1:]
+        combine_attn_masks = tokenized_text_encode['attention_mask']+context_token_ids['attention_mask'][1:]
 
         item = {
-            'id': line_idx,
+            'id': sample["ID"],
+            'content': sample["Text"],
             'input_ids': combine_inputs,
             'token_type_ids': combine_type_ids,
             'attention_mask': combine_attn_masks,
-            'pos_tag': tokenized_text_pos, # 只作目標的
+            'pos_tag': tokenized_text_pos,
             'tag_n': tag_n,
+            'value': value_list,
             'tag': sample['Tag'],
-            'start_idx': start_idx, 
-            'end_idx':end_idx
+            'start_idx': start_idx.tolist(), 
+            'end_idx':end_idx.tolist()
         }
-
         stack.append(item)
-   
+
     return stack
 
 

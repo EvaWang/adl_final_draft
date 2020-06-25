@@ -51,12 +51,14 @@ def main(args):
         # tags = [normalize_tag(tag) for tag in tags]
 
         prediction = " ".join(["{tag}:{value}".format(tag=tag.replace(" ", ""), value=value.replace(" ", "")) for tag, value in zip(tags, values)])
+        only_tag = " ".join(["{tag}".format(tag=tag.replace(" ", "")) for tag in tags])
         if prediction == "":
             prediction = "NONE"
-        converted_data.append({"ID": row["ID"], "Prediction": prediction})
+            only_tag = "NONE"
+        converted_data.append({"ID": row["ID"], "Prediction": prediction, "Only_Tag": only_tag})
 
     with open(args.output_file, "w") as csvfile:
-        writer = csv.DictWriter(csvfile, ["ID", "Prediction"])
+        writer = csv.DictWriter(csvfile, ["ID", "Prediction", "Only_Tag"])
         writer.writeheader()
         writer.writerows(converted_data)
 
