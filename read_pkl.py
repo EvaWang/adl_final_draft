@@ -58,6 +58,7 @@ def check_val(dataset):
     limit = 100
     for data in dataset:
     # for data in tqdm(dataset):
+        print(data["content"])
         # print(data["id"])
         # print(data["input_ids"][423:])
         # print(data["token_type_ids"][423:])
@@ -79,39 +80,41 @@ def check_val(dataset):
         #         print(f'extracted:{tokenizer.decode(extract_ans, skip_special_tokens=False).replace(" ","")}')
         #     elif e!=-1 and s!=-1:
         #         print(f'{s},{e}, {tokenizer.decode(content_ids, skip_special_tokens=False).replace(" ","")}')
-        val_list = data["value"]
-        tag_list = data["tag"]
-        if len(tag_list) != len(val_list) and len(tag_list)>0:
-            val_list = val_list* len(tag_list)
 
-        truth = []
-        for tag, val in zip(tag_list, val_list):
-            truth.append(f"{tag}:{val}")
+        # val_list = data["value"]
+        # tag_list = data["tag"]
+        # if len(tag_list) != len(val_list) and len(tag_list)>0:
+        #     val_list = val_list* len(tag_list)
 
-        if len(truth) == 0:
-            truth.append("NONE")
+        # read val
+        # truth = []
+        # for tag, val in zip(tag_list, val_list):
+        #     truth.append(f"{tag}:{val}")
 
-        predict_list = []
-        content_ids = data["input_ids"][1:]
-        for i in range(1,21):
-            tag_idx = data["tag_n"][i]
-            if tag_idx == 1:
-                s, e = data["start_idx"][i-1], data["end_idx"][i-1]
-                extract_ans = tokenizer.decode(content_ids[s:e+1], skip_special_tokens=True).replace(" ","").replace("##","")
-                tag_name = [ tag_name for tag_name in tag_map if (tag_map[tag_name] == i)]
-                predict_list.append(f"{tag_name[0]}:{extract_ans}")
+        # if len(truth) == 0:
+        #     truth.append("NONE")
 
-        if len(predict_list) == 0:
-            predict_list.append("NONE")
+        # predict_list = []
+        # content_ids = data["input_ids"][1:102]
+        # for i in range(1,21):
+        #     tag_idx = data["tag_n"][i]
+        #     if tag_idx == 1:
+        #         s, e = data["start_idx"][i-1], data["end_idx"][i-1]
+        #         extract_ans = tokenizer.decode(content_ids[s:e+1], skip_special_tokens=True).replace(" ","").replace("##","")
+        #         tag_name = [ tag_name for tag_name in tag_map if (tag_map[tag_name] == i)]
+        #         predict_list.append(f"{tag_name[0]}:{extract_ans}")
 
-        print(f'{data["id"]},{" ".join(predict_list)},{" ".join(truth)}')
+        # if len(predict_list) == 0:
+        #     predict_list.append("NONE")
 
-        # limit = limit -1
-        # if limit <0: break
+        # print(f'{data["id"]},{" ".join(predict_list)},{" ".join(truth)}')
+
+        limit = limit -1
+        if limit <0: break
     pass
 
 
 if __name__ == '__main__':
 
-    dataset = read_pkl("dev_max_100_2")
+    dataset = read_pkl("train_max_100_2")
     check_val(dataset)

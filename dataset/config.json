@@ -1,9 +1,8 @@
 {
-    "max_text_len": 100, 
-    "target_max_len": 91,
-    "lower_case": true,
+    "max_text_len": 512, 
+    "target_max_len": 100,
     "data_folder": "./release2/train/ca_data",
-    "output_filename":"./dataset/train_max_100_2.pkl",
+    "output_filename":"./dataset/train_max_512_1.pkl",
     "parent_text":"./dataset/train_combine_content.json",
     "is_testset": false,
     "tag_map" : {

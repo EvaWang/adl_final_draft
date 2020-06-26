@@ -6,6 +6,7 @@ from tqdm import tqdm
 from pathlib import Path
 import pandas as pd
 import numpy as np
+import math
 import unicodedata
 import re
 from rakutenma import RakutenMA
@@ -60,10 +61,21 @@ def combine_lines(samples, config):
         line_idx = sample["ID"]
         try:
             # 下一個是title則前面內容清空
-            is_title = True if type(samples["Is Title"][i+1]) != float else False
+            next_is_title = True if type(samples["Is Title"][i+1]) != float else False
         except:
             # 最後一行
-            is_title = True
+            next_is_title = True
+
+        # 本身是title 補parent
+        is_title = True if type(sample["Is Title"]) != float else False
+        parent_index = -1 if math.isnan(sample["Parent Index"]) else int(sample["Parent Index"])
+        if parent_index>0 and is_title:
+            parent_index = f"{line_idx.split('-')[0]}-{parent_index}"
+            parent_row = samples.loc[samples['ID'] == parent_index]
+            line_start = len(content)
+            content = content + parent_row["Text"].values[0]
+            line_end = len(content)
+            content_idx.append([line_idx, line_start, line_end])
 
          # 組合同段落 
         line_start = len(content)
@@ -72,12 +84,10 @@ def combine_lines(samples, config):
         content_idx.append([line_idx, line_start, line_end])
         # 組合同段落完畢
 
-        if (is_title or current_page != line_idx.split('-')[0]) and len(content)>0:
+        if (next_is_title or current_page != line_idx.split('-')[0]) and len(content)>0:
             # 先清空前面的content、content_idx
-            # tokenized_text_encode = tokenizer.encode_plus(content, pad_to_max_length=True, return_attention_mask=True, return_token_type_ids=True, max_length=config["max_text_len"])
             current_page = line_idx.split('-')[0]
             content_token = tokenizer.tokenize(content)
-            # tokenized_text_pos = map_pos(content_token, config["pos_map"])
 
             stack[ f'content_{i}'] = {
                 'content_text':content,

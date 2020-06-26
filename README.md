@@ -1,6 +1,8 @@
 ## 實驗記錄
 1. v_num=54, lr: 1.0e-05,dev-score:0.9184137546699499,  memo: 單行訓練，lr太大會沒有結果
-2. 
+2. v_num=58, lr: 1.0e-05,dev-score:0.9582366610387962,  memo: 加上同段落訓練
+2. v_num=59, lr: 1.0e-05,dev-score: ,   memo: 跟58做沒pos的比較
+2. v_num=62, lr: 1.0e-05,dev-score: ,   memo: 測tag不分開train
 
 
 
