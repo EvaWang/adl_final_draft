@@ -1,9 +1,9 @@
 {
     "max_text_len": 512, 
     "target_max_len": 100,
-    "data_folder": "./release2/train/ca_data",
-    "output_filename":"./dataset/train_max_512_1.pkl",
-    "parent_text":"./dataset/train_combine_content.json",
+    "data_folder": "./release2/test/ca_data",
+    "preprocessed_filename":"./dataset/test_max_512_1.pkl",
+    "parent_text":"./dataset/test_combine_content.json",
     "is_testset": false,
     "tag_map" : {
         "NONE": 0,

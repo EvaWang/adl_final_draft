@@ -29,12 +29,12 @@ def main(args):
     print(f"config:{config}")
 
     # loading datasets from excel files
-    file_list = os.listdir(config["data_folder"])
+    file_list = os.listdir(args.data_folder)
     df_train = []
     df_list = []
     for filepath in tqdm(file_list):
         filename = os.path.basename(filepath).split('.')[0]
-        df = pd.read_excel(os.path.join(config["data_folder"], filepath), header=0)
+        df = pd.read_excel(os.path.join(args.data_folder, filepath), header=0)
         df['ID'] = df['Index'].map(lambda x: filename+'-'+str(x))
         df_list.append(df)
         
@@ -48,13 +48,13 @@ def main(args):
     
     # create_bert_dataset(
     #     process_samples(df_train, config, config["is_testset"]),
-    #     config["output_filename"],
+    #     config["preprocessed_filename"],
     #     config["max_text_len"]
     # )
 
     create_bert_dataset(
         process_samples_with_parent_text(df_train, parent_text_list, config, config["is_testset"]),
-        config["output_filename"],
+        config["preprocessed_filename"],
         config["target_max_len"]+2
     )
 
@@ -263,6 +263,7 @@ def create_bert_dataset(samples, save_path, max_text_len):
 def _parse_args():
     parser = argparse.ArgumentParser(description="")
     parser.add_argument('config_path', type=Path, help='')
+    parser.add_argument('data_folder', type=Path, help='')
     args = parser.parse_args()
     return args
 

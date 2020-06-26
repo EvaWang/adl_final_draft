@@ -22,7 +22,7 @@ import sys
 
 def prediction(args):
 
-    with open(args.config_path) as f:
+    with open(args.config_path / 'config.json') as f:
         config = json.load(f)
 
     tag_map = config["tag_map"]
@@ -32,7 +32,7 @@ def prediction(args):
     pretrained_model.freeze()
 
     tokenizer = BertTokenizer.from_pretrained('cl-tohoku/bert-base-japanese', do_lower_case=False)
-    dataloader = pretrained_model.user_dataloader(args.dataset_path)
+    dataloader = pretrained_model.user_dataloader(config["preprocessed_filename"])
 
     ans = []
     # for batch in dataloader:
@@ -50,11 +50,7 @@ def prediction(args):
             if hastag[index].item()>0:
                 tag_name.append("NONE")
             else:
-                tags = (predict_tag[index]>0).nonzero().tolist()
-
-                
-                for p_i, p_val in enumerate(predict_tag[index].tolist()):
-                    ans_item[f"{p_i}"] = p_val
+                tags = (predict_tag[index]>4).nonzero().tolist()
                 
                 tag_name = tag_name + [ tag_name for tag_name in tag_map if ([tag_map[tag_name]-1] in tags)]
                 for t_i, tag in enumerate(tags):
@@ -83,12 +79,9 @@ def _parse_args():
         description="Run Bert finetune for qa"
     )
 
-    parser.add_argument('--model_path', type=str, help='model_path', default="./lightning_logs/version_54/checkpoints/epoch=1.ckpt")
+    parser.add_argument('--model_path', type=str, help='model_path', default="")
     parser.add_argument('--config_path', type=str, help='config_path', default="./dataset/config.json")
-    parser.add_argument('--dataset_path', type=str, help='dataset_path', default="./dataset/dev_max_100_2.pkl")
-    parser.add_argument('--predict_path', type=str, help='predict_path', default="./test_54_1.csv")
-    parser.add_argument('--debug', type=bool, help='debug info', default=False)
-    parser.add_argument('--tag_threshold', type=float, help='tag_threshold', default=0)
+    parser.add_argument('--predict_path', type=str, help='predict_path', default="./prediction.csv")
 
     args = parser.parse_args()
     return args
@@ -97,8 +90,7 @@ def main(args):
     print(args)
     
     ans_list = prediction(args)
-    # csv_header = ["ID", "Prediction", "Check",  "Check2"]
-    csv_header = ["ID", "Prediction", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"]
+    csv_header = ["ID", "Prediction"]
 
     with open(args.predict_path, "w") as csvfile:
         writer = csv.DictWriter(csvfile, csv_header)
