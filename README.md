@@ -1,5 +1,9 @@
 # ADL Final Project (Shared Task Challenge)
 
+## task description
+CinnamonAI對文件定義20類標記，
+每一行文字可能無標記、若有標記可能不只一個。
+
 ## Create Environment And Dowload Model
 
 `bash download.sh`
@@ -8,7 +12,9 @@
 
 `python3.6 train_extrac_val.py`
 
-訓練模型 hyperparameters定義於程式碼內
+- 訓練模型，hyperparameters定義於程式碼內。
+- Fine-tuning BERT，另外加上以樂天NLP工具得到的詞性標記。
+
 
 ## Prediction
 
@@ -73,3 +79,7 @@ Include:
 * TF bert model
 * Training process
 * Evaluation and Prediction
+
+## dev note
+- `train.py`: classification only
+- `train_extrac_val.py`: extract label value
