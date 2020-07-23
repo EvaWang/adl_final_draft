@@ -1,77 +1,75 @@
-## 實驗記錄
-1. v_num=54, lr: 1.0e-05,dev-score:0.9184137546699499,  memo: 單行訓練，lr太大會沒有結果
-2. v_num=58, lr: 1.0e-05,dev-score:0.9582366610387962,  memo: 加上同段落訓練
-2. v_num=59, lr: 1.0e-05,dev-score: ,   memo: 跟58做沒pos的比較
-2. v_num=62, lr: 1.0e-05,dev-score: ,   memo: 測tag不分開train
+# ADL Final Project (Shared Task Challenge)
 
+## Create Environment And Dowload Model
 
+`bash download.sh`
 
-## 實驗想法 用QA做
-[Content][SEP][TAG_1]...[TAG_n][SEP]
-[有答案/沒答案]
-分20次train?
-一次train?
-POS用途？
+## Training
 
-Python 3.7.5
+`python3.6 train_extrac_val.py`
+
+訓練模型 hyperparameters定義於程式碼內
+
+## Prediction
+
+1. `python3.6 combine_lines.py {config_path} {data_folder}`
+
+    合併同一段落的資料
+
+2. `python3.6 preprocess.py  {config_path} {data_folder}`
+
+將資料處理為模型需要的格式
+
+3. `python3.6 evaluation.py --model_path {model_path} --predict_path {predict_path} --config_path {config_path}`
+
+    輸出預測資料
+
+4. `python3.6 test.py {path_to_test_set_directory}`
+
+    依順序執行前1.2.3.檔案
+
+## requirement
 
 pip install pdf2image # 應該用不到
+
 pip install torch==1.4 torchvision==0.5.0
-pip install pytorch-lightning
+
+pip install pytorch-lightning==0.7.6
+
 pip install pandas
+
 pip install transformers
+
 pip install xlrd
+
 pip install rakutenma #https://github.com/rakuten-nlp/rakutenma
 
 bert-base-japanese
 https://github.com/cl-tohoku/bert-japanese
 
-### PoS tag list in Japanese and correspondence to BCCWJ tags
 
-| Tag  | Original JA name | English             |
-| ---  | ---------------- | ------------------  |
-| A-c  | 形容詞-一般       | Adjective-Common    |
-| A-dp | 形容詞-非自立可能  | Adjective-Dependent |
-| C    | 接続詞            | Conjunction         |
-| D    | 代名詞            | Pronoun             |
-| E    | 英単語            | English word        |
-| F    | 副詞              | Adverb              |
-| I-c  | 感動詞-一般        | Interjection-Common |
-| J-c  | 形状詞-一般        | Adjectival Noun-Common |
-| J-tari | 形状詞-タリ      | Adjectival Noun-Tari |
-| J-xs | 形状詞-助動詞語幹   | Adjectival Noun-AuxVerb stem |
-| M-aa | 補助記号-AA        | Auxiliary sign-AA |
-| M-c  | 補助記号-一般      | Auxiliary sign-Common |
-| M-cp | 補助記号-括弧閉    | Auxiliary sign-Open Parenthesis |
-| M-op | 補助記号-括弧開    | Auxiliary sign-Close Parenthesis |
-| M-p  | 補助記号-句点      | Auxiliary sign-Period |
-| N-n  | 名詞-名詞的        | Noun-Noun |
-| N-nc | 名詞-普通名詞      | Noun-Common Noun |
-| N-pn | 名詞-固有名詞      | Noun-Proper Noun |
-| N-xs | 名詞-助動詞語幹    | Noun-AuxVerb stem |
-| O    | その他            | Others            |
-| P    | 接頭辞             | Prefix |
-| P-fj | 助詞-副助詞        | Particle-Adverbial |
-| P-jj | 助詞-準体助詞      | Particle-Phrasal |
-| P-k  | 助詞-格助詞        | Particle-Case Marking |
-| P-rj | 助詞-係助詞        | Particle-Binding |
-| P-sj | 助詞-接続助詞      | Particle-Conjunctive |
-| Q-a  | 接尾辞-形容詞的    | Suffix-Adjective |
-| Q-j  | 接尾辞-形状詞的    | Suffix-Adjectival Noun |
-| Q-n  | 接尾辞-名詞的      | Suffix-Noun |
-| Q-v  | 接尾辞-動詞的      | Suffix-Verb |
-| R    | 連体詞            | Adnominal adjective |
-| S-c  | 記号-一般         | Sign-Common |
-| S-l  | 記号-文字         | Sign-Letter  |
-| U    | URL              | URL         |
-| V-c  | 動詞-一般         | Verb-Common |
-| V-dp | 動詞-非自立可能    | Verb-Dependent |
-| W    | 空白              | Whitespace |
-| X    | 助動詞            | AuxVerb |
+## Kaggle Submission Before Competition Closed
 
+### Last submission to Kaggle
+Download model
+```
+bash download2.sh
+```
+Generate a prediction file `prediction.csv`
+```
+python3.6 test2.py {path_to_test_set_directory}
+```
 
-['次', 'の', '##と', '##おり', '一', '般', '競', '争', '入', '札', 'に', '付', 'しま', '##す', '。']
-['次', 'の', 'とおり',         '一般',     '競争',     '入札',     'に', '付し', 'ます',       '。']
-[17,   24,  17,17,17,        17, 17,     17, 17,    17, 17,     24,  35, 35, 38, 38,      15]
+### TF Bert Model
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1CS1sz6qMJjni2U130kY50lGOYkEWkNWG?usp=sharing)
 
-[['次', 'N-nc'], ['の', 'P-k'], ['とおり', 'N-nc'], ['一般', 'N-nc'], ['競争', 'N-nc'], ['入札', 'N-nc'], ['に', 'P-k'], ['付し', 'V-c'], ['ます', 'X'], ['。', 'M-p']]
+In the file `tf_bert_model.ipynb`
+
+Use bert model for a simple token classification.
+
+Include:
+* Generate more dataset (synonym replacement)
+* Preprocessing training data
+* TF bert model
+* Training process
+* Evaluation and Prediction
